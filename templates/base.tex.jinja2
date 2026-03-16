@@ -1,0 +1,32 @@
+\documentclass[{{ font_size }}pt]{article}
+\usepackage[
+    paperwidth={{ image_width }}pt,
+    paperheight={{ image_height }}pt,
+    top={{ margin }}pt,
+    bottom={{ margin }}pt,
+    left={{ margin }}pt,
+    right={{ margin }}pt
+]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+{% if use_lualatex %}
+\usepackage{fontspec}
+\usepackage{unicode-math}
+\setmainfont{Latin Modern Roman}
+\setmathfont{Latin Modern Math}
+{% else %}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+{% endif %}
+\usepackage{enumitem}
+\usepackage{microtype}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1pt}
+\setlist[itemize]{leftmargin=8pt, itemsep=0pt, topsep=1pt, parsep=0pt}
+\setlist[enumerate]{leftmargin=8pt, itemsep=0pt, topsep=1pt, parsep=0pt}
+\pagestyle{empty}
+
+\begin{document}
+\fontsize{ {{- font_size -}} }{ {{- leading -}} }\selectfont
+{{ body }}
+\end{document}
