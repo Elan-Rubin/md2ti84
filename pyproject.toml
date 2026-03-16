@@ -13,24 +13,26 @@ dependencies = [
     "jinja2>=3.1",
     "pdf2image>=1.16",
     "Pillow>=10.0",
+    "imagequant>=1.1",
+    "zx0>=2.2",
 ]
 
 [project.scripts]
 md2ti84 = "md2ti84.cli:main"
 
 [tool.md2ti84]
-# Target TI-84 CE image var dimensions
-image_width = 265
-image_height = 165
+# Target resolution — TI-84 CE native screen
+image_width = 320
+image_height = 240
 # LaTeX font size in pt
-font_size = 7
+font_size = 8
 # Page margin in pt
-margin = 4
+margin = 6
 # PDF render DPI before downscaling
 render_dpi = 300
 # LaTeX engine: "lualatex" or "pdflatex"
 latex_engine = "lualatex"
 # Estimated max lines per page (tune this empirically)
-max_lines_per_page = 18
+max_lines_per_page = 24
 # Grayscale by default (crisper text, smaller files)
 grayscale = true

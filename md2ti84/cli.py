@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 from . import parser as md_parser
-from . import renderer, paginator, latex_builder, compiler, image_converter, calc_exporter
+from . import renderer, paginator, latex_builder, compiler, image_converter, hdpic_exporter
 
 
 def _load_defaults() -> dict:
@@ -21,7 +21,6 @@ def _load_defaults() -> dict:
         except ImportError:
             return {}
 
-    # Walk up from this file to find pyproject.toml
     here = Path(__file__).parent
     for parent in [here, here.parent, here.parent.parent]:
         candidate = parent / "pyproject.toml"
@@ -36,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ap = argparse.ArgumentParser(
         prog="md2ti84",
-        description="Convert Markdown notes to TI-84 CE image vars (.png / .8ca)",
+        description="Convert Markdown notes to HD Picture Viewer .8xv AppVars for TI-84 CE",
     )
     ap.add_argument("input", type=Path, help="Input Markdown file")
     ap.add_argument(
@@ -44,12 +43,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Output directory (default: same directory as input file)",
     )
     ap.add_argument(
-        "--font-size", type=int, default=defaults.get("font_size", 7),
-        help="LaTeX font size in pt (default: 7)",
+        "--font-size", type=int, default=defaults.get("font_size", 8),
+        help="LaTeX font size in pt (default: 8)",
     )
     ap.add_argument(
-        "--margin", type=int, default=defaults.get("margin", 4),
-        help="Page margin in pt (default: 4)",
+        "--margin", type=int, default=defaults.get("margin", 6),
+        help="Page margin in pt (default: 6)",
     )
     ap.add_argument(
         "--dpi", type=int, default=defaults.get("render_dpi", 300),
@@ -61,24 +60,24 @@ def main(argv: list[str] | None = None) -> int:
         help="LaTeX engine (default: lualatex)",
     )
     ap.add_argument(
-        "--max-lines", type=float, default=defaults.get("max_lines_per_page", 18.0),
-        help="Estimated max lines per page for pagination (default: 18)",
+        "--max-lines", type=float, default=defaults.get("max_lines_per_page", 24.0),
+        help="Estimated max lines per page for pagination (default: 24)",
     )
     ap.add_argument(
         "--no-grayscale", action="store_true",
         help="Keep color output instead of the default grayscale",
     )
     ap.add_argument(
-        "--no-8ca", action="store_true",
-        help="Skip .8ca export even if img2calc is available",
+        "--no-8xv", action="store_true",
+        help="Skip HD Picture Viewer .8xv export, output PNGs only",
     )
     ap.add_argument(
-        "--width", type=int, default=defaults.get("image_width", 265),
-        help="Output image width in pixels (default: 265)",
+        "--width", type=int, default=defaults.get("image_width", 320),
+        help="Output image width in pixels (default: 320)",
     )
     ap.add_argument(
-        "--height", type=int, default=defaults.get("image_height", 165),
-        help="Output image height in pixels (default: 165)",
+        "--height", type=int, default=defaults.get("image_height", 240),
+        help="Output image height in pixels (default: 240)",
     )
 
     args = ap.parse_args(argv)
@@ -104,12 +103,6 @@ def main(argv: list[str] | None = None) -> int:
     pages = paginator.paginate(chunks, max_lines=args.max_lines)
     print(f"[md2ti84] {len(pages)} page(s) to render.")
 
-    if len(pages) > 9:
-        print(
-            f"[md2ti84] Warning: {len(pages)} pages exceed the TI-84 CE limit of 9 "
-            "image vars. Only the first 9 pages can be stored as Image1–Image9."
-        )
-
     png_paths: list[Path] = []
 
     with tempfile.TemporaryDirectory(prefix="md2ti84_") as tmpdir:
@@ -118,7 +111,6 @@ def main(argv: list[str] | None = None) -> int:
         for page_num, page_chunks in enumerate(pages, start=1):
             print(f"[md2ti84] Compiling page {page_num}/{len(pages)} ...")
 
-            # Build .tex
             tex_content = latex_builder.build(
                 page_chunks,
                 font_size=args.font_size,
@@ -130,14 +122,12 @@ def main(argv: list[str] | None = None) -> int:
             tex_path = tmp / f"{stem}_page{page_num:02d}.tex"
             tex_path.write_text(tex_content, encoding="utf-8")
 
-            # Compile to PDF
             try:
                 pdf_path = compiler.compile_tex(tex_path, tmp, engine=args.engine)
             except RuntimeError as e:
                 print(f"[md2ti84] Error on page {page_num}:\n{e}", file=sys.stderr)
                 return 1
 
-            # Convert PDF → PNG
             png_path = output_dir / f"{stem}_page{page_num:02d}.png"
             image_converter.convert(
                 pdf_path,
@@ -150,11 +140,10 @@ def main(argv: list[str] | None = None) -> int:
             png_paths.append(png_path)
             print(f"[md2ti84]   → {png_path.name}")
 
-    # Optionally export .8ca
-    if not args.no_8ca:
-        eight_ca_paths = calc_exporter.export(png_paths, output_dir, prefix=stem)
-        if eight_ca_paths:
-            print(f"[md2ti84] Exported {len(eight_ca_paths)} .8ca file(s).")
+    if not args.no_8xv:
+        appvar_files = hdpic_exporter.export(png_paths, output_dir, prefix_base=stem[0].upper())
+        if appvar_files:
+            print(f"[md2ti84] Exported {len(appvar_files)} .8xv AppVar file(s).")
 
     print(f"[md2ti84] Done. {len(png_paths)} PNG(s) written to {output_dir}")
     return 0
