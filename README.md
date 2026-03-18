@@ -18,8 +18,8 @@ pip install "markdown-it-py[linkify]" mdit-py-plugins jinja2 pdf2image Pillow im
 
 System dependencies (must be installed separately):
 
-- **lualatex** — via [MiKTeX](https://miktex.org/) (Windows) or `texlive-full` (Linux/Mac)
-- **poppler** — via [poppler for Windows](https://github.com/oschwartz10612/poppler-windows/releases) or `poppler-utils` (Linux/Mac)
+- **lualatex** - via [MiKTeX](https://miktex.org/) (Windows) or `texlive-full` (Linux/Mac)
+- **poppler** - via [poppler for Windows](https://github.com/oschwartz10612/poppler-windows/releases) or `poppler-utils` (Linux/Mac)
 
 ## Usage
 
@@ -29,13 +29,14 @@ md2ti84 notes.md -o output/
 
 Common options:
 
-- `--engine pdflatex` — use pdflatex instead of lualatex (faster, less complete Unicode)
-- `--font-size 6` — smaller font to fit more content per page
-- `--no-grayscale` — keep color output (grayscale is the default)
-- `--max-lines 28` — adjust pagination threshold
-- `--no-8xv` — skip `.8xv` export, output PNGs only
+- `--engine pdflatex` - use pdflatex instead of lualatex (faster, less complete Unicode)
+- `--font-size 6` - smaller font to fit more content per page
+- `--no-grayscale` - keep color output (grayscale is the default)
+- `--max-lines 28` - adjust pagination threshold
+- `--no-8xv` - skip `.8xv` export, output PNGs only
+- `--clean` - delete all files in the output directory before running
 
-Output PNGs are named `<stem>_page01.png`, `<stem>_page02.png`, etc. Each page also produces a set of `.8xv` AppVar files (one per 80x80 tile, plus one palette file).
+Output PNGs are placed in `<output>/images/` and named `<stem>_page01.png`, `<stem>_page02.png`, etc. Each page also produces a set of `.8xv` AppVar files (one per 80x80 tile, plus one palette file) directly in the output directory.
 
 ## Viewing on the calculator
 

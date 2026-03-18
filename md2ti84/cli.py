@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 import tempfile
 from pathlib import Path
 
 from . import parser as md_parser
 from . import renderer, paginator, latex_builder, compiler, image_converter, hdpic_exporter
+from .progress import track, status
 
 
 def _load_defaults() -> dict:
@@ -79,6 +81,10 @@ def main(argv: list[str] | None = None) -> int:
         "--height", type=int, default=defaults.get("image_height", 240),
         help="Output image height in pixels (default: 240)",
     )
+    ap.add_argument(
+        "--clean", action="store_true",
+        help="Delete all files in the output directory before running",
+    )
 
     args = ap.parse_args(argv)
 
@@ -88,64 +94,71 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     output_dir: Path = (args.output_dir or md_file.parent).resolve()
+
+    if args.clean and output_dir.exists():
+        status(f"Cleaning {output_dir} ...")
+        shutil.rmtree(output_dir)
+
     output_dir.mkdir(parents=True, exist_ok=True)
+    images_dir = output_dir / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
 
     stem = md_file.stem
 
-    print(f"[md2ti84] Parsing {md_file.name} ...")
+    status(f"Parsing {md_file.name} ...")
     text = md_file.read_text(encoding="utf-8")
     tokens = md_parser.parse(text)
 
-    print("[md2ti84] Rendering to LaTeX chunks ...")
+    status("Rendering to LaTeX chunks ...")
     chunks = renderer.render(tokens)
 
-    print(f"[md2ti84] Paginating (max {args.max_lines} lines/page) ...")
+    status(f"Paginating (max {args.max_lines} lines/page) ...")
     pages = paginator.paginate(chunks, max_lines=args.max_lines)
-    print(f"[md2ti84] {len(pages)} page(s) to render.")
+    status(f"{len(pages)} page(s) to render.")
 
     png_paths: list[Path] = []
 
     with tempfile.TemporaryDirectory(prefix="md2ti84_") as tmpdir:
         tmp = Path(tmpdir)
 
-        for page_num, page_chunks in enumerate(pages, start=1):
-            print(f"[md2ti84] Compiling page {page_num}/{len(pages)} ...")
+        with track(pages, "Compiling pages") as bar:
+            for page_num, page_chunks in bar:
+                page_num += 1  # track yields 0-based index
 
-            tex_content = latex_builder.build(
-                page_chunks,
-                font_size=args.font_size,
-                image_width=args.width,
-                image_height=args.height,
-                margin=args.margin,
-                use_lualatex=(args.engine == "lualatex"),
-            )
-            tex_path = tmp / f"{stem}_page{page_num:02d}.tex"
-            tex_path.write_text(tex_content, encoding="utf-8")
+                tex_content = latex_builder.build(
+                    page_chunks,
+                    font_size=args.font_size,
+                    image_width=args.width,
+                    image_height=args.height,
+                    margin=args.margin,
+                    use_lualatex=(args.engine == "lualatex"),
+                )
+                tex_path = tmp / f"{stem}_page{page_num:02d}.tex"
+                tex_path.write_text(tex_content, encoding="utf-8")
 
-            try:
-                pdf_path = compiler.compile_tex(tex_path, tmp, engine=args.engine)
-            except RuntimeError as e:
-                print(f"[md2ti84] Error on page {page_num}:\n{e}", file=sys.stderr)
-                return 1
+                try:
+                    pdf_path = compiler.compile_tex(tex_path, tmp, engine=args.engine)
+                except RuntimeError as e:
+                    print(f"[md2ti84] Error on page {page_num}:\n{e}", file=sys.stderr)
+                    return 1
 
-            png_path = output_dir / f"{stem}_page{page_num:02d}.png"
-            image_converter.convert(
-                pdf_path,
-                png_path,
-                target_width=args.width,
-                target_height=args.height,
-                render_dpi=args.dpi,
-                grayscale=not args.no_grayscale,
-            )
-            png_paths.append(png_path)
-            print(f"[md2ti84]   → {png_path.name}")
+                png_path = images_dir / f"{stem}_page{page_num:02d}.png"
+                image_converter.convert(
+                    pdf_path,
+                    png_path,
+                    target_width=args.width,
+                    target_height=args.height,
+                    render_dpi=args.dpi,
+                    grayscale=not args.no_grayscale,
+                )
+                png_paths.append(png_path)
 
     if not args.no_8xv:
         appvar_files = hdpic_exporter.export(png_paths, output_dir, prefix_base=stem[0].upper())
         if appvar_files:
-            print(f"[md2ti84] Exported {len(appvar_files)} .8xv AppVar file(s).")
+            status(f"Exported {len(appvar_files)} .8xv AppVar file(s).")
 
-    print(f"[md2ti84] Done. {len(png_paths)} PNG(s) written to {output_dir}")
+    status(f"Done. {len(png_paths)} PNG(s) written to {images_dir}")
     return 0
 
 

@@ -20,6 +20,8 @@ from pathlib import Path
 
 from PIL import Image
 
+from .progress import track, status
+
 TILE_SIZE = 80
 PALETTE_SIZE = 256
 
@@ -204,8 +206,8 @@ def export(
     """
     convimg = _find_convimg()
     if convimg is None:
-        print(
-            "[md2ti84] Warning: convimg not found. "
+        status(
+            "Warning: convimg not found. "
             "Place convimg.exe in the project root or set CONVIMG_PATH. "
             "Skipping .8xv export."
         )
@@ -213,17 +215,16 @@ def export(
 
     all_files: list[Path] = []
 
-    for idx, png in enumerate(png_paths):
-        letter = chr(ord(prefix_base[0]) + idx // 10)
-        digit = str(idx % 10)
-        var_prefix = letter + digit
+    with track(png_paths, "Exporting .8xv AppVars") as bar:
+        for idx, png in bar:
+            letter = chr(ord(prefix_base[0]) + idx // 10)
+            digit = str(idx % 10)
+            var_prefix = letter + digit
 
-        print(f"[md2ti84] Converting {png.name} -> HD Picture Viewer (prefix {var_prefix}) ...")
-        try:
-            files = convert_image(png, output_dir, var_prefix, convimg)
-            all_files.extend(files)
-            print(f"[md2ti84]   {len(files)} AppVar file(s) written.")
-        except Exception as e:
-            print(f"[md2ti84] Warning: failed to convert {png.name}: {e}")
+            try:
+                files = convert_image(png, output_dir, var_prefix, convimg)
+                all_files.extend(files)
+            except Exception as e:
+                status(f"Warning: failed to convert {png.name}: {e}")
 
     return all_files
